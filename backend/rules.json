@@ -1,0 +1,43 @@
+{
+  "plastic_bottle": {
+    "name": "Chai nhựa",
+    "bin_color": "yellow",
+    "instruction": "Đổ hết chất lỏng, tráng sơ nếu cần, làm bẹp chai và bỏ vào nhóm rác tái chế."
+  },
+  "metal_can": {
+    "name": "Lon kim loại",
+    "bin_color": "yellow",
+    "instruction": "Đổ hết đồ uống, tráng sơ, làm bẹp lon nếu an toàn và bỏ vào nhóm rác tái chế."
+  },
+  "milk_carton": {
+    "name": "Hộp sữa giấy",
+    "bin_color": "yellow",
+    "instruction": "Tráng sạch, để ráo, ép phẳng; chỉ đưa vào tái chế nếu điểm thu gom nhận bao bì giấy nhiều lớp."
+  },
+  "battery": {
+    "name": "Pin cũ",
+    "bin_color": "orange",
+    "instruction": "Không bỏ vào rác sinh hoạt. Che hai cực nếu có thể và gửi tới điểm thu gom pin hoặc chất thải nguy hại."
+  },
+  "foam_container": {
+    "name": "Vỏ hộp xốp",
+    "bin_color": "gray",
+    "instruction": "Làm sạch thức ăn thừa. Hộp xốp thường khó tái chế; bỏ vào rác còn lại trừ khi địa phương có điểm thu hồi riêng."
+  },
+  "food_waste": {
+    "name": "Thức ăn thừa",
+    "bin_color": "green",
+    "instruction": "Để ráo nước và bỏ vào nhóm rác thực phẩm/hữu cơ; không trộn lẫn pin hay vật liệu tái chế."
+  },
+  "plastic_bag": {
+    "name": "Túi nilon",
+    "bin_color": "gray",
+    "instruction": "Làm sạch và gom riêng để tái sử dụng hoặc gửi điểm thu hồi nếu có; nếu bẩn/không có điểm nhận, bỏ vào rác còn lại."
+  },
+  "paper": {
+    "name": "Giấy",
+    "bin_color": "yellow",
+    "instruction": "Giữ khô, gấp gọn và bỏ vào nhóm giấy tái chế; giấy dính dầu mỡ hoặc thức ăn nên bỏ vào rác còn lại."
+  }
+}
+
