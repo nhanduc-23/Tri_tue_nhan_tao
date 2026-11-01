@@ -7,29 +7,35 @@
   <title>Smart Waste Sorter</title>
   <style>
     :root { font-family: system-ui, sans-serif; color: #18312a; background: #f3f7f4; }
-    body { max-width: 960px; margin: auto; padding: 1rem; }
+    body { max-width: 960px; margin: auto; padding: clamp(1rem, 4vw, 2rem); }
     h1 { color: #176b52; }
-    .camera { position: relative; width: 100%; background: #14231e; border-radius: 12px; overflow: hidden; }
-    video, canvas { display: block; width: 100%; height: auto; }
-    canvas { position: absolute; inset: 0; }
-    button { border: 0; border-radius: 8px; padding: .7rem 1rem; margin: .75rem .4rem .75rem 0; background: #176b52; color: white; font-size: 1rem; }
-    button:disabled { opacity: .55; }
+    .camera { position: relative; width: 100%; background: #14231e; border-radius: 12px; overflow: hidden; line-height: 0; touch-action: manipulation; }
+    video, #snapshot, canvas { display: block; width: 100%; height: auto; object-fit: contain; }
+    canvas { position: absolute; inset: 0; pointer-events: none; }
+    [hidden] { display: none !important; }
+    button { min-height: 48px; border: 0; border-radius: 10px; padding: .8rem 1.2rem; margin: .75rem .4rem .75rem 0; background: #176b52; color: white; font-size: 1rem; cursor: pointer; touch-action: manipulation; }
+    button:disabled { opacity: .55; cursor: default; }
     #status { min-height: 1.5em; }
     table { width: 100%; border-collapse: collapse; background: white; }
     th, td { text-align: left; border-bottom: 1px solid #dce7e0; padding: .65rem; }
     .hint { color: #53665e; }
+    #instructions { padding: 0; list-style: none; }
+    #instructions li { background: white; margin: .5rem 0; padding: .8rem; border-left: .5rem solid var(--bin-color, #777); border-radius: 6px; }
+    .bin-label { font-weight: 700; }
   </style>
 </head>
 <body>
   <h1>Smart Waste Sorter</h1>
-  <p class="hint">Bản thử nghiệm dùng nhận diện mô phỏng. Hướng dẫn phân loại có thể khác theo quy định và điểm thu gom địa phương.</p>
-  <div class="camera"><video id="video" autoplay muted playsinline></video><canvas id="overlay"></canvas></div>
-  <button id="start">Bật camera</button>
+  <p class="hint">Bản thử nghiệm dùng nhận diện mô phỏng. Hướng dẫn phân loại là bản nháp, cần kiểm tra theo hướng dẫn địa phương.</p>
+  <div class="camera"><video id="video" autoplay muted playsinline></video><img id="snapshot" alt="Ảnh đã chụp" hidden><canvas id="overlay"></canvas></div>
+  <button id="start">Bắt đầu camera</button>
   <button id="stop" disabled>Dừng camera</button>
+  <button id="photo-button">Chụp 1 ảnh</button>
+  <input id="photo-input" type="file" accept="image/*" capture="environment" hidden>
   <p id="status" role="status">Sẵn sàng.</p>
-  <h2>Thống kê phát hiện</h2>
+  <h2>Thống kê trong phiên</h2>
   <table><thead><tr><th>Loại rác</th><th>Số lần</th></tr></thead><tbody id="stats"><tr><td colspan="2">Chưa có dữ liệu</td></tr></tbody></table>
-  <h2>Hướng dẫn</h2>
+  <h2>Phân loại và hướng dẫn</h2>
   <ul id="instructions"><li>Chưa có vật thể được phát hiện.</li></ul>
   <script src="app.js"></script>
 </body>
