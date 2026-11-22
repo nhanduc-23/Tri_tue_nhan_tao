@@ -1,6 +1,6 @@
 # Tri_tue_nhan_tao - Smart Waste Sorter & Tracker
 
-Hệ thống AI nhận diện và phân loại rác thải theo thời gian thực sử dụng mô hình **YOLOv8n**[cite: 2, 7].
+Hệ thống AI nhận diện và phân loại rác thải theo thời gian thực sử dụng mô hình **YOLOv8n**.
 
 ## Cấu trúc thư mục dự án
 

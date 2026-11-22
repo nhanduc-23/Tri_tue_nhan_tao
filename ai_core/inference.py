@@ -1,17 +1,21 @@
+from pathlib import Path
 import time
 from collections import deque, Counter
 import cv2
 import numpy as np
 import onnxruntime as ort
 
+ROOT_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_MODEL_PATH = ROOT_DIR / "models" / "waste_yolov8_int8.onnx"
+
 class SmartWasteDetector:
-    def __init__(self, model_path="models/waste_yolov8_int8.onnx", conf_thres=0.52, iou_thres=0.45):
-        self.session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+    def __init__(self, model_path=None, conf_thres=0.52, iou_thres=0.45):
+        target_path = str(model_path or DEFAULT_MODEL_PATH)
+        self.session = ort.InferenceSession(target_path, providers=["CPUExecutionProvider"])
         self.input_name = self.session.get_inputs()[0].name
         self.conf_thres = conf_thres
         self.iou_thres = iou_thres
 
-        # SỬA LẠI THỨ TỰ NHÃN DƯỚI ĐÂY CHO KHỚP KẾT QUẢ BƯỚC 1
         self.class_names = {
             0: "plastic_bottle",
             1: "can",
@@ -49,7 +53,6 @@ class SmartWasteDetector:
             bw = int(w * orig_w / 640)
             bh = int(h * orig_h / 640)
 
-            # Lọc nhiễu kích thước khung hình (1.5% - 85% diện tích)
             area_ratio = (bw * bh) / frame_area
             if 0.015 <= area_ratio <= 0.85:
                 boxes.append([x1, y1, bw, bh])
@@ -73,7 +76,6 @@ class SmartWasteDetector:
                     "bbox": [x, y, x + w, y + h]
                 })
 
-        # Bỏ phiếu đa khung hình (3/5 khung) chống nhận nhầm nền
         if use_temporal_filter:
             self.frame_history.append(current_labels)
             label_counts = Counter(lbl for frame_lbls in self.frame_history for lbl in frame_lbls)
