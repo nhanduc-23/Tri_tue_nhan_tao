@@ -1,8 +1,12 @@
 .venv/
 __pycache__/
-*.onnx
+*.pyc
 .env
+datasets/
+runs/
 node_modules/
+cloudflared*.exe
+.DS_Store
 
 *.pyc
 *.pt

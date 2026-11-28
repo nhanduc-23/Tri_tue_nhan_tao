@@ -28,3 +28,22 @@ Mở `frontend/index.html` trực tiếp trong trình duyệt trên máy tính. 
 
 Camera trên điện thoại cần HTTPS hoặc localhost. Chạy backend và frontend trên máy phát triển, sau đó dùng Cloudflare Tunnel hoặc ngrok (có thể có giới hạn gói miễn phí) để tạo HTTPS URL. Cập nhật `API_URL` trong `frontend/app.js` thành URL backend có thể truy cập từ điện thoại; mở URL HTTPS của frontend. Không đưa dữ liệu nhạy cảm lên tunnel công khai.
 
+## Cách chạy
+
+Từ thư mục gốc repo, tạo môi trường ảo và cài dependency:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+Đặt `USE_MOCK=0` để dùng model ONNX thật. Có thể đặt `MODEL_PATH` nếu model không nằm ở `models/waste_yolov8_int8.onnx`. PowerShell:
+
+```powershell
+$env:USE_MOCK = "0"
+# Tùy chọn: $env:MODEL_PATH = "models/waste_yolov8_int8.onnx"
+uvicorn backend.main:app --host 0.0.0.0 --port 8000
+```
+
+Mở frontend tại `http://localhost:8000/`.

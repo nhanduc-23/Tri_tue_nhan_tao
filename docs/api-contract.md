@@ -57,3 +57,12 @@ TV3 cung cấp `run_inference(image_bytes) -> list[dict]` trong `backend/inferen
 | Ngày | Người sửa | Nội dung |
 |---|---|---|
 | | | |
+### Nhãn model
+
+Các nhãn model hiện tại: `plastic_bottle`, `can`, `cardboard`, `nylon-bag`.
+
+Ngưỡng cố định 0.52 trong `ai_core/inference.py`.
+
+| Ngày | Thay đổi |
+|---|---|
+| 2026-11-28 | Đồng bộ danh sách nhãn với model và ghi chú ngưỡng confidence cố định 0.52. |

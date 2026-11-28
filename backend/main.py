@@ -2,46 +2,34 @@ from __future__ import annotations
 
 import json
 import os
-import time
-from io import BytesIO
+import threading
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+import cv2
+import numpy as np
+from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from PIL import Image, UnidentifiedImageError
-
-from inference import run_inference
-from mock_inference import mock_inference
 
 BASE_DIR = Path(__file__).resolve().parent
-MAX_IMAGE_BYTES = 5 * 1024 * 1024
-ALLOWED_TYPES = {"image/jpeg": "JPEG", "image/png": "PNG"}
-DEFAULT_INSTRUCTION = "Bỏ vào nhóm rác còn lại và làm theo hướng dẫn phân loại tại địa phương."
-
-
-def load_rules() -> dict[str, dict[str, str]]:
-    with (BASE_DIR / "rules.json").open("r", encoding="utf-8") as rules_file:
-        return json.load(rules_file)
-
-
-# Load once when the application module starts.
-RULES = load_rules()
+ROOT_DIR = BASE_DIR.parent
+RULES_PATH = BASE_DIR / "rules.json"
+FRONTEND_DIR = ROOT_DIR / "frontend"
+MODEL_PATH = os.getenv("MODEL_PATH", "models/waste_yolov8_int8.onnx")
 USE_MOCK = os.getenv("USE_MOCK", "1").strip().lower() not in {"0", "false", "no"}
-MODEL_PATH = Path(os.getenv("MODEL_PATH", "../models/best.onnx"))
-if not MODEL_PATH.is_absolute():
-    MODEL_PATH = (BASE_DIR / MODEL_PATH).resolve()
 
-# Resolve canonical labels and aliases once at startup; inference may emit either.
-RULE_LOOKUP: dict[str, tuple[str, dict[str, str]]] = {}
-for canonical_name, rule in RULES.items():
-    RULE_LOOKUP[canonical_name] = (canonical_name, rule)
+with RULES_PATH.open("r", encoding="utf-8") as f:
+    RULES: dict[str, dict[str, Any]] = json.load(f)
+
+ALIASES: dict[str, str] = {}
+for canonical, rule in RULES.items():
+    ALIASES[canonical] = canonical
     for alias in rule.get("aliases", []):
-        RULE_LOOKUP[alias] = (canonical_name, rule)
+        ALIASES[alias] = canonical
 
-app = FastAPI(title="Smart Waste Sorter API", version="0.1.0")
+app = FastAPI(title="Smart Waste Sorter API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -50,87 +38,94 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.exception_handler(HTTPException)
-async def contract_http_error(_request: Request, exc: HTTPException) -> JSONResponse:
-    if isinstance(exc.detail, dict) and "error" in exc.detail:
-        return JSONResponse(status_code=exc.status_code, content=exc.detail)
-    return JSONResponse(status_code=exc.status_code, content={"error": "inference_failed"})
+_detector: Any | None = None
+_detector_lock = threading.Lock()
 
 
-def enrich_detections(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    detections = []
-    for item in raw:
-        reported_name = str(item.get("class", "unknown"))
-        match = RULE_LOOKUP.get(reported_name)
-        # Return the rules.json canonical label for aliases; change this assignment
-        # if the dataset/API contract later requires preserving the model label.
-        class_name = match[0] if match else reported_name
-        rule = match[1] if match else {}
-        detection = dict(item)
-        detection["class"] = class_name
-        detection["class_vi"] = rule.get("class_vi", class_name)
-        detection["bin_group"] = rule.get("bin_group", "residual")
-        detection["bin_color"] = rule.get("bin_color", "gray")
-        detection["instruction"] = rule.get("instruction", DEFAULT_INSTRUCTION)
-        detections.append(detection)
-    return detections
+def _get_detector() -> Any:
+    global _detector
+    if _detector is None:
+        with _detector_lock:
+            if _detector is None:
+                # Import only when real inference is enabled; use the shared TV2/TV3 implementation.
+                from ai_core.inference import SmartWasteDetector
+
+                model_path = Path(MODEL_PATH)
+                if not model_path.is_absolute():
+                    model_path = ROOT_DIR / model_path
+                _detector = SmartWasteDetector(model_path=str(model_path))
+    return _detector
+
+
+def _mock_inference(image_bgr: np.ndarray) -> dict[str, Any]:
+    height, width = image_bgr.shape[:2]
+    return {
+        "detections": [
+            {
+                "class_id": 0,
+                "label": "plastic_bottle",
+                "confidence": 0.91,
+                "bbox": [round(width * 0.2), round(height * 0.2), round(width * 0.8), round(height * 0.8)],
+            }
+        ],
+        "inference_time_ms": 0.0,
+    }
 
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    model_found = MODEL_PATH.is_file()
-    degraded = not USE_MOCK and not model_found
+    model_file = Path(MODEL_PATH)
+    if not model_file.is_absolute():
+        model_file = ROOT_DIR / model_file
     return {
-        "status": "degraded" if degraded else "ok",
-        "mode": "mock" if USE_MOCK else "model",
-        "model_path": str(MODEL_PATH),
-        "model_found": model_found,
+        "status": "ok",
+        "mode": "mock" if USE_MOCK else "onnx",
+        "model_path": str(model_file),
+        "model_found": model_file.is_file(),
     }
 
 
-@app.post("/detect")
-async def detect(file: UploadFile = File(...)) -> dict[str, Any]:
+@app.post("/detect", response_model=None)
+async def detect(file: UploadFile = File(...)) -> JSONResponse | dict[str, Any]:
     try:
-        if not USE_MOCK and not MODEL_PATH.is_file():
-            raise HTTPException(status_code=500, detail={"error": "inference_failed"})
-        content_type = (file.content_type or "").lower()
-        if content_type not in ALLOWED_TYPES:
-            raise HTTPException(status_code=400, detail={"error": "invalid_image"})
+        content = await file.read()
+        image_bgr = cv2.imdecode(np.frombuffer(content, dtype=np.uint8), cv2.IMREAD_COLOR)
+        if image_bgr is None:
+            return JSONResponse(status_code=400, content={"error": "invalid_image"})
 
-        image_bytes = await file.read(MAX_IMAGE_BYTES + 1)
-        if len(image_bytes) > MAX_IMAGE_BYTES:
-            raise HTTPException(status_code=413, detail={"error": "file_too_large"})
+        if USE_MOCK:
+            result = _mock_inference(image_bgr)
+        else:
+            result = _get_detector().predict(image_bgr, use_temporal_filter=False)
 
-        try:
-            with Image.open(BytesIO(image_bytes)) as image:
-                if image.format != ALLOWED_TYPES[content_type]:
-                    raise HTTPException(status_code=400, detail={"error": "invalid_image"})
-                image.load()
-                image_width, image_height = image.size
-        except (UnidentifiedImageError, OSError, ValueError) as exc:
-            raise HTTPException(status_code=400, detail={"error": "invalid_image"}) from exc
-
-        started = time.perf_counter()
-        try:
-            raw = mock_inference(image_bytes) if USE_MOCK else run_inference(image_bytes)
-            if not raw:
-                raw = mock_inference(image_bytes)
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail={"error": "inference_failed"}) from exc
-        inference_ms = round((time.perf_counter() - started) * 1000)
-
+        height, width = image_bgr.shape[:2]
+        detections = []
+        for detection in result.get("detections", []):
+            raw_label = str(detection.get("label", "unknown"))
+            canonical = ALIASES.get(raw_label, raw_label)
+            rule = RULES.get(canonical, {})
+            detections.append(
+                {
+                    "class": canonical,
+                    "class_vi": rule.get("class_vi", raw_label),
+                    "confidence": float(detection.get("confidence", 0.0)),
+                    "bbox": detection.get("bbox", [0, 0, width, height]),
+                    "bin_group": rule.get("bin_group", "other"),
+                    "bin_color": rule.get("bin_color", "gray"),
+                    "instruction": rule.get("instruction", "Chưa có hướng dẫn cho nhãn này."),
+                }
+            )
         return {
-            "image_width": image_width,
-            "image_height": image_height,
-            "inference_ms": inference_ms,
-            "detections": enrich_detections(raw),
+            "detections": detections,
+            "image_width": int(width),
+            "image_height": int(height),
+            "inference_ms": float(result.get("inference_time_ms", 0.0)),
         }
+    except Exception:
+        return JSONResponse(status_code=500, content={"error": "inference_failed"})
     finally:
         await file.close()
 
 
-# Mount last so the frontend fallback never shadows /health or /detect.
-FRONTEND_DIR = (Path(__file__).resolve().parent.parent / "frontend").resolve()
-app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
-
+if FRONTEND_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

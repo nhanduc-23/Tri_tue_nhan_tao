@@ -6,10 +6,8 @@
       "type": "debugpy",
       "request": "launch",
       "module": "uvicorn",
-      "args": ["main:app", "--reload", "--port", "8000"],
-      "cwd": "${workspaceFolder}/backend",
-      "jinja": true
+      "args": ["backend.main:app", "--port", "8000"],
+      "cwd": "${workspaceFolder}"
     }
   ]
 }
-
