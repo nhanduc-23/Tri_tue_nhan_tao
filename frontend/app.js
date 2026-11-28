@@ -7,21 +7,58 @@ const video = document.querySelector("#video");
 const snapshot = document.querySelector("#snapshot");
 const photoInput = document.querySelector("#photo-input");
 const photoButton = document.querySelector("#photo-button");
+const installButton = document.querySelector("#install-button");
 const canvas = document.querySelector("#overlay");
 const context = canvas.getContext("2d");
 const statusText = document.querySelector("#status");
+const serverStatusText = document.querySelector("#server-status");
 const statsBody = document.querySelector("#stats");
+const statsTotal = document.querySelector("#stats-total");
 const instructionsList = document.querySelector("#instructions");
 const startButton = document.querySelector("#start");
 const stopButton = document.querySelector("#stop");
+const clearStatsButton = document.querySelector("#clear-stats");
+const exportCsvButton = document.querySelector("#export-csv");
+const confidenceInput = document.querySelector("#confidence-threshold");
+const confidenceValue = document.querySelector("#confidence-value");
 let stream = null;
 let timer = null;
 let requestInProgress = false;
 const totals = new Map();
+const classMetadata = new Map();
+const lastFrameCounts = new Map();
+const lastCountedAt = new Map();
+const countHistory = [];
 let lastDetections = [];
 let lastImageWidth = 0;
 let lastImageHeight = 0;
 let snapshotUrl = null;
+let serverModeLabel = "";
+let lastInferenceMs = null;
+
+function renderServerStatus() {
+  if (!serverModeLabel) return;
+  const latency = lastInferenceMs === null ? "Chưa có lượt nhận diện" : `Inference: ${lastInferenceMs} ms`;
+  serverStatusText.textContent = `Chế độ: ${serverModeLabel} · ${latency}`;
+}
+
+async function loadServerHealth() {
+  try {
+    const response = await fetch(`${API_URL}/health`);
+    if (!response.ok) throw new Error("Health request failed");
+    const health = await response.json();
+    serverModeLabel = health.mode === "mock" ? "dữ liệu giả" : "model thật";
+    renderServerStatus();
+  } catch (_error) {
+    serverModeLabel = "";
+    serverStatusText.textContent = "Không kết nối được máy chủ";
+  }
+}
+
+function visibleDetections(detections) {
+  const threshold = Number(confidenceInput.value);
+  return detections.filter((item) => Number(item.confidence) >= threshold);
+}
 
 function activeMedia() {
   return snapshot && !snapshot.hidden ? snapshot : video;
@@ -73,32 +110,73 @@ function drawDetections(detections, imageWidth, imageHeight) {
   });
 }
 
-function updateSummary(detections) {
-  const latest = new Map();
-  detections.forEach((item) => {
-    const key = item.class || "unknown";
-    totals.set(key, (totals.get(key) || 0) + 1);
-    latest.set(key, item);
+function countCurrentFrame(detections) {
+  const frameCounts = new Map();
+  const detectionsByClass = new Map();
+  detections.forEach((detection) => {
+    const className = detection.class || "unknown";
+    frameCounts.set(className, (frameCounts.get(className) || 0) + 1);
+    if (!detectionsByClass.has(className)) detectionsByClass.set(className, []);
+    detectionsByClass.get(className).push(detection);
+    classMetadata.set(className, detection);
   });
+
+  const now = Date.now();
+  frameCounts.forEach((count, className) => {
+    const previousCount = lastFrameCounts.get(className) || 0;
+    const increase = Math.max(0, count - previousCount);
+    const cooldownPassed = now - (lastCountedAt.get(className) || 0) >= 3000;
+    // Chosen rule: count newly increased same-class objects immediately; when the
+    // frame count is steady, count at most one again per label every three seconds.
+    const added = increase > 0 ? increase : (cooldownPassed ? 1 : 0);
+    if (!added) return;
+
+    const candidates = detectionsByClass.get(className);
+    const countedDetections = increase > 0
+      ? candidates.slice(previousCount, previousCount + added)
+      : [candidates.reduce((best, item) => item.confidence > best.confidence ? item : best)];
+    totals.set(className, (totals.get(className) || 0) + added);
+    lastCountedAt.set(className, now);
+    countedDetections.forEach((detection) => {
+      countHistory.push({ timestamp: new Date(now).toISOString(), ...detection });
+    });
+    if (countHistory.length > 1000) countHistory.splice(0, countHistory.length - 1000);
+  });
+
+  lastFrameCounts.clear();
+  frameCounts.forEach((count, className) => lastFrameCounts.set(className, count));
+}
+
+function renderSummary(detections) {
   statsBody.replaceChildren();
+  let totalCount = 0;
   if (!totals.size) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 2;
+    cell.colSpan = 3;
     cell.textContent = "Chưa có dữ liệu";
     row.append(cell);
     statsBody.append(row);
   } else {
-    totals.forEach((count, key) => {
+    totals.forEach((count, className) => {
+      totalCount += count;
+      const metadata = classMetadata.get(className) || {};
       const row = document.createElement("tr");
       const name = document.createElement("td");
-      const total = document.createElement("td");
-      name.textContent = latest.get(key)?.class_vi || key;
-      total.textContent = String(count);
-      row.append(name, total);
+      const quantity = document.createElement("td");
+      const bin = document.createElement("td");
+      name.textContent = metadata.class_vi || className;
+      quantity.textContent = String(count);
+      const swatch = document.createElement("span");
+      swatch.className = "color-swatch";
+      swatch.style.backgroundColor = BIN_COLORS[metadata.bin_color] || metadata.bin_color || "#737b80";
+      swatch.setAttribute("aria-label", `Màu thùng ${metadata.bin_color || "chưa rõ"}`);
+      bin.append(swatch, document.createTextNode(metadata.bin_color || "chưa rõ"));
+      row.append(name, quantity, bin);
       statsBody.append(row);
     });
   }
+  statsTotal.textContent = String(totalCount);
 
   instructionsList.replaceChildren();
   if (!detections.length) {
@@ -118,6 +196,11 @@ function updateSummary(detections) {
       instructionsList.append(item);
     });
   }
+}
+
+function updateSummary(detections) {
+  countCurrentFrame(detections);
+  renderSummary(detections);
 }
 
 async function sendFrame() {
@@ -154,11 +237,13 @@ async function submitImage(blob, filename) {
     if (response.status === 413) throw new Error("Ảnh vượt quá giới hạn 5 MB.");
     throw new Error(result.error === "inference_failed" ? "Bộ nhận diện đang gặp sự cố." : `Backend trả về HTTP ${response.status}.`);
   }
-  lastDetections = Array.isArray(result.detections) ? result.detections : [];
+  lastDetections = visibleDetections(Array.isArray(result.detections) ? result.detections : []);
   lastImageWidth = result.image_width;
   lastImageHeight = result.image_height;
   resizeOverlay();
   updateSummary(lastDetections);
+  lastInferenceMs = result.inference_ms;
+  renderServerStatus();
   statusText.textContent = `${lastDetections.length} vật thể · ${result.inference_ms} ms.`;
 }
 
@@ -233,4 +318,86 @@ window.addEventListener("resize", resizeOverlay);
 window.addEventListener("orientationchange", () => window.setTimeout(resizeOverlay, 150));
 video.addEventListener("loadedmetadata", resizeOverlay);
 snapshot.addEventListener("load", resizeOverlay);
+
+// Offline support is optional; registration errors must not affect camera/API use.
+(async () => {
+  try {
+    if (window.isSecureContext && "serviceWorker" in navigator) {
+      await navigator.serviceWorker.register("sw.js");
+    }
+  } catch (error) {
+    console.warn("Service worker registration failed:", error);
+  }
+})();
+
+const standaloneMode = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let installPrompt = null;
+installButton.hidden = true;
+if (!standaloneMode) {
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    installPrompt = event;
+    installButton.hidden = false;
+  });
+  installButton.addEventListener("click", async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice;
+    installPrompt = null;
+    installButton.hidden = true;
+  });
+  window.addEventListener("appinstalled", () => {
+    installPrompt = null;
+    installButton.hidden = true;
+  });
+}
+
+function csvCell(value) {
+  const textValue = String(value ?? "");
+  return `"${textValue.replaceAll('"', '""')}"`;
+}
+
+function exportStatsCsv() {
+  const columns = ["thời gian", "class", "class_vi", "bin_group", "bin_color", "confidence"];
+  const lines = [columns.map(csvCell).join(",")];
+  countHistory.forEach((row) => {
+    lines.push([
+      row.timestamp,
+      row.class,
+      row.class_vi,
+      row.bin_group,
+      row.bin_color,
+      row.confidence,
+    ].map(csvCell).join(","));
+  });
+
+  const now = new Date();
+  const twoDigits = (number) => String(number).padStart(2, "0");
+  const filename = `waste-stats-${now.getFullYear()}${twoDigits(now.getMonth() + 1)}${twoDigits(now.getDate())}-${twoDigits(now.getHours())}${twoDigits(now.getMinutes())}.csv`;
+  const blob = new Blob(["\uFEFF", lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function clearSessionStats() {
+  totals.clear();
+  classMetadata.clear();
+  lastFrameCounts.clear();
+  lastCountedAt.clear();
+  countHistory.length = 0;
+  renderSummary([]);
+}
+
+confidenceInput.addEventListener("input", () => {
+  confidenceValue.textContent = Number(confidenceInput.value).toFixed(2);
+});
+clearStatsButton.addEventListener("click", clearSessionStats);
+exportCsvButton.addEventListener("click", exportStatsCsv);
+loadServerHealth();
 

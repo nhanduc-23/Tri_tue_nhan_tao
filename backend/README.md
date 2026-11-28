@@ -30,3 +30,9 @@ backend/.venv/Scripts/python -m uvicorn main:app --app-dir backend --reload --po
 4. Mở link HTTPS do cloudflared in ra trên điện thoại; trang, API và camera dùng chung link.
 
 Link tunnel là công khai; chỉ bật khi test và tắt ngay khi xong.
+
+## Model và trạng thái health
+
+- `USE_MOCK=1` là mặc định, API dùng mock. Đặt `$env:USE_MOCK = "0"` để chuyển sang đường inference của model.
+- `MODEL_PATH` chỉ định file model; mặc định là `../models/best.onnx` (đường dẫn tương đối được tính từ thư mục `backend/`). Backend chỉ kiểm tra file có tồn tại, không load model; việc load thuộc `backend/inference.py` của TV3.
+- `GET /health` trả `status`, `mode`, `model_path`, `model_found`. Khi mock đang bật, status là `ok`; khi `USE_MOCK=0` nhưng không tìm thấy model, status là `degraded`. `/detect` khi đó trả HTTP 500 `{"error":"inference_failed"}`.
