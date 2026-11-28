@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#176b52">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>Smart Waste Sorter</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #18312a; background: #f3f7f4; }
+    * { box-sizing: border-box; }
+    body { max-width: 960px; width: 100%; margin: auto; padding: clamp(.75rem, 4vw, 2rem); overflow-x: hidden; }
+    h1 { color: #176b52; }
+    .camera { position: relative; width: 100%; background: #14231e; border-radius: 12px; overflow: hidden; line-height: 0; touch-action: manipulation; }
+    video, #snapshot, canvas { display: block; width: 100%; height: auto; object-fit: contain; }
+    canvas { position: absolute; inset: 0; pointer-events: none; }
+    [hidden] { display: none !important; }
+    button { min-height: 48px; border: 0; border-radius: 10px; padding: .8rem 1.2rem; margin: .75rem .4rem .75rem 0; background: #176b52; color: white; font-size: 1rem; cursor: pointer; touch-action: manipulation; }
+    button:disabled { opacity: .55; cursor: default; }
+    #status { min-height: 1.5em; }
+    .table-scroll { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; background: white; border-radius: 8px; }
+    table { width: 100%; min-width: 390px; border-collapse: collapse; background: white; }
+    th, td { text-align: left; border-bottom: 1px solid #dce7e0; padding: .65rem; }
+    .hint { color: #53665e; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+    .threshold-control { display: grid; grid-template-columns: 1fr auto; gap: .35rem .75rem; align-items: center; max-width: 28rem; margin: 1rem 0; }
+    .threshold-control label { grid-column: 1 / -1; font-weight: 600; }
+    .threshold-control input { width: 100%; min-height: 40px; accent-color: #176b52; }
+    .color-swatch { display: inline-block; width: 1.25rem; height: 1.25rem; margin-right: .45rem; vertical-align: middle; border: 1px solid #59635f; border-radius: 50%; }
+    #server-status { padding: .7rem .8rem; background: #e7f1eb; border-radius: 8px; }
+    #instructions { padding: 0; list-style: none; }
+    #instructions li { background: white; margin: .5rem 0; padding: .8rem; border-left: .5rem solid var(--bin-color, #777); border-radius: 6px; }
+    .bin-label { font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>Smart Waste Sorter</h1>
+  <p class="hint">Bản thử nghiệm dùng nhận diện mô phỏng. Hướng dẫn phân loại là bản nháp, cần kiểm tra theo hướng dẫn địa phương.</p>
+  <div class="camera"><video id="video" autoplay muted playsinline></video><img id="snapshot" alt="Ảnh đã chụp" hidden><canvas id="overlay"></canvas></div>
+  <button id="start">Bắt đầu camera</button>
+  <button id="stop" disabled>Dừng camera</button>
+  <button id="photo-button">Chụp 1 ảnh</button>
+  <button id="install-button" hidden>Cài ứng dụng</button>
+  <input id="photo-input" type="file" accept="image/*" capture="environment" hidden>
+  <p id="status" role="status">Sẵn sàng.</p>
+  <p id="server-status" role="status" aria-live="polite">Đang kết nối máy chủ…</p>
+  <div class="threshold-control">
+    <label for="confidence-threshold">Ngưỡng tin cậy: <span id="confidence-value">0.50</span></label>
+    <input id="confidence-threshold" type="range" min="0.30" max="0.90" step="0.05" value="0.50">
+  </div>
+  <h2>Thống kê trong phiên</h2>
+  <div class="toolbar">
+    <button id="clear-stats">Xóa thống kê</button>
+    <button id="export-csv">Xuất CSV</button>
+  </div>
+  <div class="table-scroll" role="region" aria-label="Bảng thống kê, có thể cuộn ngang">
+    <table>
+      <thead><tr><th>Loại rác</th><th>Số lượng</th><th>Màu thùng</th></tr></thead>
+      <tbody id="stats"><tr><td colspan="3">Chưa có dữ liệu</td></tr></tbody>
+      <tfoot><tr><th scope="row">Tổng</th><th id="stats-total">0</th><td></td></tr></tfoot>
+    </table>
+  </div>
+  <h2>Phân loại và hướng dẫn</h2>
+  <ul id="instructions"><li>Chưa có vật thể được phát hiện.</li></ul>
+  <script src="app.js"></script>
+</body>
+</html>
+

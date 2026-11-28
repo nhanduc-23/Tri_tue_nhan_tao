@@ -1,0 +1,9 @@
+﻿.venv/
+__pycache__/
+*.pyc
+.env
+datasets/
+runs/
+node_modules/
+cloudflared*.exe
+.DS_Store

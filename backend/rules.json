@@ -1,0 +1,51 @@
+{
+  "plastic_bottle": {
+    "class_vi": "Chai nhựa",
+    "aliases": [],
+    "bin_group": "recyclable",
+    "bin_color": "yellow",
+    "instruction": "Đổ hết chất lỏng, làm sạch và bỏ vào nhóm tái chế theo hướng dẫn địa phương."
+  },
+  "can": {
+    "class_vi": "Lon kim loại",
+    "aliases": ["metal_can", "aluminum_can"],
+    "bin_group": "recyclable",
+    "bin_color": "yellow",
+    "instruction": "Đổ hết chất lỏng, làm sạch và bỏ vào nhóm tái chế theo hướng dẫn địa phương."
+  },
+  "cardboard": {
+    "class_vi": "Bìa carton",
+    "aliases": ["paper_carton", "paper"],
+    "bin_group": "recyclable",
+    "bin_color": "blue",
+    "instruction": "bản nháp, cần TV3 duyệt"
+  },
+  "nylon-bag": {
+    "class_vi": "Túi nilon",
+    "aliases": ["plastic_bag", "nylon_bag"],
+    "bin_group": "recyclable",
+    "bin_color": "yellow",
+    "instruction": "Làm sạch và gom riêng để tái sử dụng hoặc gửi điểm thu hồi nếu có."
+  },
+  "battery": {
+    "class_vi": "Pin cũ",
+    "aliases": [],
+    "bin_group": "hazardous",
+    "bin_color": "orange",
+    "instruction": "Không bỏ vào rác sinh hoạt; gửi tới điểm thu gom pin hoặc chất thải nguy hại."
+  },
+  "foam_container": {
+    "class_vi": "Vỏ hộp xốp",
+    "aliases": [],
+    "bin_group": "other",
+    "bin_color": "gray",
+    "instruction": "Làm sạch thức ăn thừa; bỏ vào rác còn lại nếu địa phương không có điểm thu hồi riêng."
+  },
+  "food_waste": {
+    "class_vi": "Thức ăn thừa",
+    "aliases": [],
+    "bin_group": "organic",
+    "bin_color": "green",
+    "instruction": "Để ráo nước và bỏ vào nhóm rác thực phẩm hoặc hữu cơ."
+  }
+}
