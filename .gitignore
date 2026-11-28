@@ -1,4 +1,4 @@
-.venv/
+﻿.venv/
 __pycache__/
 *.pyc
 .env
@@ -7,12 +7,3 @@ runs/
 node_modules/
 cloudflared*.exe
 .DS_Store
-
-*.pyc
-*.pt
-models/*
-!models/.gitkeep
-datasets/
-runs/
-.DS_Store
-!models/README.md
